@@ -48,6 +48,7 @@ export default {
 
         //ensure that if a request is added to new cassette, it 
         //doesn't hit the server again
+        try {
         server.respondWith(
           settings.type, newResponse.url,
           [
@@ -56,24 +57,34 @@ export default {
             JSON.stringify(JSON.parse(newResponse.data))
           ]
         );
+        } catch (e) {
+          console.warn(newResponse.url);
+          responses.pop();
+        }
       }
     });
   },
 
   download: function() {
     //convert responses into string expected by sinon
-    strings.push("export default function(server) {\n\n");
+    strings.push("export var responses = {};\n\n");
     if (responses.length > 0){
       responses.forEach(function(response) {
-        strings.push("server.respondWith( '"+ response.type + "', \n");
+        strings.push("responses['" + response.url + "'] = ['"+ response.type + "', \n");
         strings.push("'" + response.url +  "',\n");
         strings.push("  [\n " + response.status + ",\n");
         strings.push(JSON.stringify(response.headers) + ",\n");
         strings.push(JSON.stringify(JSON.stringify(JSON.parse(response.data))) + "\n");
-        strings.push("]);\n\n");
+        strings.push("]];\n\n");
       });
 
+      strings.push("export default function(server) {\n");
+      strings.push("  Object.keys(responses).forEach(function (key) {\n");
+      strings.push("    server.respondWith.apply(server, responses[key]);\n");
+      strings.push("  });\n");
       strings.push("}");
+      
+
       //html 5 for downloading recordings
       var blob = new window.Blob(strings);
       var encodedUri = window.URL.createObjectURL(blob);
